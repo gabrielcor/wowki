@@ -1,101 +1,158 @@
 #include <FastLED.h>
-#define NUM_LEDS 15 
-#define DATA_PINA 18 // Connect to the data wires on the pixel strips
-#define DATA_PINB 17
-#define DATA_PINC 5
-#define BUTTON_PIN  26
+#include <WiFi.h>
+#include <HTTPClient.h>
+#define NUM_LEDS 20 
+#define DATA_PINA 17 // Connect to the data wires on the pixel strips
+#define DATA_PINB 19
+#define DATA_PINC 16
+#define BUTTON_PINA  26
+#define BUTTON_PINB 25
+#define BUTTON_PINC 
 
 bool gameStarted = true;
 bool buttonPressed = false;
+
 CRGB ledsA[NUM_LEDS]; // sets number of pixels that will light on each strip.
 CRGB ledsB[NUM_LEDS];
 CRGB ledsC[NUM_LEDS];
 
+
+const CRGB coo = CRGB::Green;
+
+const char* url2SendResult = "https://eovunmo8a5u8h34.m.pipedream.net";
+/*
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+*/
+const char* ssid = "blackcrow_01";
+const char* password = "8001017170";
 // LED control variables
-int ledIndex = 0;
-bool increasing = true;
+#define CANT_STRIPS 3;
+int ledIndexes[3];
+CRGB ledColors[3];
+
+bool increasing[3];
 unsigned long lastUpdate = 0;
-const unsigned long updateInterval = 500; 
+const unsigned long updateInterval = 50; 
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  Serial.begin(9600);
+  for (int i = 0; i < 3; i++)
+  {
+    ledIndexes[i]=0;
+    increasing[i]=true;
+  }
+  ledColors[0]=CRGB::Green;
+  ledColors[1]=CRGB::Blue;
+  ledColors[2]=CRGB::Yellow;
+
+  
   Serial.println("Hello, ESP32!");
   FastLED.addLeds<WS2812B, DATA_PINA, GRB>(ledsA, NUM_LEDS);
   FastLED.addLeds<WS2812B, DATA_PINB, GRB>(ledsB, NUM_LEDS);
   FastLED.addLeds<WS2812B, DATA_PINC, GRB>(ledsC, NUM_LEDS);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  randomSeed(4); 
+  pinMode(BUTTON_PINA, INPUT_PULLUP);
+
+    WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi");
+
 }
 
-void SendLedCountToApi(int index)
-{
-  return;
-}
 
 
-void updateLeds() {
-  if (increasing) {
-    ledIndex++;
-    if (ledIndex >= NUM_LEDS) {
-      increasing = false;
+void updateLeds(CRGB *led2Update, int stripNumber) {
+  int paintTo=0;
+  if (increasing[stripNumber]) {
+        
+    ledIndexes[stripNumber]++;
+    if (ledIndexes[stripNumber] >= NUM_LEDS) {
+      increasing[stripNumber] = false;
     }
   } else {
-    ledIndex--;
-    if (ledIndex <= 0) {
-      increasing = true;
-    }
-  }
 
-  for (int i = 0; i < NUM_LEDS; i++) {
-    if (i < ledIndex) {
-      ledsA[i] = CRGB::White;  // Set color to white
-    } else {
-      ledsA[i] = CRGB::Black;  // Turn off
+    
+    ledIndexes[stripNumber]--;
+    if (ledIndexes[stripNumber] <= 0) {
+      increasing[stripNumber] = true;
     }
   }
-  FastLED.show();
+    paintTo = ledIndexes[stripNumber];  
+    for (size_t i = 0; i < NUM_LEDS; i++)
+    {
+        if (i<paintTo)
+          led2Update[i]= ledColors[stripNumber];  
+        else
+           led2Update[i]=CRGB::Black;
+    }
+  /*
+  
+  Serial.print("ledIndex Direction, Strip, Index:");
+  if (increasing[stripNumber])
+    Serial.print("increasing,");
+  else
+    Serial.print("decreasing,");
+  Serial.print(stripNumber);
+  Serial.print(",");
+  Serial.println(ledIndexes[stripNumber]);
+  */
+  
+}
+
+
+void sendLedCountToApi(int countA, int countB, int countC) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(url2SendResult);  // Replace with your API endpoint
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"ledA\":" + String(countA) + ",\"ledB\":" + String(countB) + ",\"ledC\":"+ String(countC)+ "}";
+    int httpResponseCode = http.POST(payload);
+
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println("HTTP Response code: " + String(httpResponseCode));
+      Serial.println("Response: " + response);
+    } else {
+      Serial.println("Error on sending POST: " + String(httpResponseCode));
+    }
+    http.end();
+  } else {
+    Serial.println("WiFi not connected");
+  }
 }
 
 void loop() {
 
 
   if (gameStarted) {
-    // Check button press
-    if (digitalRead(BUTTON_PIN) == LOW && !buttonPressed) {
+    // Check button press A
+    if (digitalRead(BUTTON_PINA) == LOW && !buttonPressed) {
       buttonPressed = true;
-      SendLedCountToApi(ledIndex);
+      if (!increasing) // si estamos decrementando es uno menos
+          { ledIndexes[0]--;}
+      sendLedCountToApi(ledIndexes[0],ledIndexes[1],ledIndexes[2]);
       gameStarted = false;  // Stop the game after sending the count
-    } else if (digitalRead(BUTTON_PIN) == HIGH) {
+    } else if (digitalRead(BUTTON_PINA) == HIGH) {
       buttonPressed = false;
     }
 
     // Update LED sequence
-    if (millis() - lastUpdate > updateInterval) {
+    
+    if ((millis() - lastUpdate) > updateInterval) {
       lastUpdate = millis();
-      updateLeds();
+      updateLeds(ledsA,0);
+       updateLeds(ledsB,1);
+       updateLeds(ledsC,2);
+      FastLED.show();
     }
   }
 
   }
-
-
-/*
-void fillStrip(int number, const struct CRGB &color) {
-  switch (number) {
-    case 1:
-    fill_solid(ledsA, NUM_LEDS, color);
-    break;
-    case 2:
-    fill_solid(ledsB, NUM_LEDS, color);
-    break;
-    case 3:
-    fill_solid(ledsC, NUM_LEDS, color);
-    break;
-  }
-    FastLED.show();
-}    
-*/
 
 
 
