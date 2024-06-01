@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "author": "Gabriel Cor",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": -86.4,
+      "left": 24.04,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel-canvas",
+      "id": "neopixels1",
+      "top": 103.8,
+      "left": 151.4,
+      "rotate": 90,
+      "attrs": { "rows": "15", "cols": "1", "pixelate": "circle", "matrixBrightness": "3.5" }
+    },
+    {
+      "type": "wokwi-neopixel-canvas",
+      "id": "neopixels2",
+      "top": 142.2,
+      "left": 161,
+      "rotate": 90,
+      "attrs": { "rows": "15", "cols": "1", "pixelate": "circle", "matrixBrightness": "3.5" }
+    },
+    {
+      "type": "wokwi-neopixel-canvas",
+      "id": "neopixels3",
+      "top": 180.6,
+      "left": 151.4,
+      "rotate": 90,
+      "attrs": { "rows": "15", "cols": "1", "pixelate": "circle", "matrixBrightness": "3.5" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": -51.4,
+      "left": -220.8,
+      "attrs": { "color": "green" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:17", "neopixels1:DIN", "green", [ "v-22", "h-140", "*", "v0" ] ],
+    [ "esp:18", "neopixels2:DIN", "green", [ "v-28", "h-120", "*", "v0" ] ],
+    [ "esp:5", "neopixels3:DIN", "green", [ "v-34", "h-100", "*", "v0" ] ],
+    [ "esp:GND.2", "neopixels1:VSS", "black", [ "v30", "h-190", "*", "v0" ] ],
+    [ "esp:GND.2", "neopixels2:VSS", "black", [ "v30", "h-190", "*", "v0" ] ],
+    [ "esp:GND.2", "neopixels3:VSS", "black", [ "v30", "h-190", "*", "v0" ] ],
+    [ "esp:5V", "neopixels1:VDD", "red", [ "v24", "h-170", "*", "v0" ] ],
+    [ "esp:5V", "neopixels2:VDD", "red", [ "v24", "h-170", "*", "v0" ] ],
+    [ "esp:5V", "neopixels3:VDD", "red", [ "v24", "h-170", "*", "v0" ] ],
+    [ "esp:26", "btn1:1.l", "green", [ "v0" ] ],
+    [ "btn1:2.l", "esp:GND.2", "black", [ "v144.2", "h375.54" ] ]
+  ],
+  "dependencies": {}
+}
