@@ -5,9 +5,9 @@
 #define DATA_PINA 17 // Connect to the data wires on the pixel strips
 #define DATA_PINB 19
 #define DATA_PINC 16
-#define BUTTON_PINA  26
+#define BUTTON_PINA  5
 #define BUTTON_PINB 25
-#define BUTTON_PINC 
+#define BUTTON_PINC 24
 
 bool gameStarted = true;
 bool buttonPressed = false;
@@ -45,7 +45,7 @@ void setup() {
   }
   ledColors[0]=CRGB::Green;
   ledColors[1]=CRGB::Blue;
-  ledColors[2]=CRGB::Yellow;
+  ledColors[2]=CRGB::Orange;
 
   
   Serial.println("Hello, ESP32!");
@@ -131,15 +131,15 @@ void loop() {
 
   if (gameStarted) {
     // Check button press A
-    if (digitalRead(BUTTON_PINA) == LOW && !buttonPressed) {
-      buttonPressed = true;
+    if (digitalRead(BUTTON_PINA) == LOW)  {
+     
       if (!increasing) // si estamos decrementando es uno menos
           { ledIndexes[0]--;}
-      sendLedCountToApi(ledIndexes[0],ledIndexes[1],ledIndexes[2]);
+      // sendLedCountToApi(ledIndexes[0],ledIndexes[1],ledIndexes[2]);
       gameStarted = false;  // Stop the game after sending the count
-    } else if (digitalRead(BUTTON_PINA) == HIGH) {
+    } /* else if (digitalRead(BUTTON_PINA) == HIGH) {
       buttonPressed = false;
-    }
+    } */
 
     // Update LED sequence
     
@@ -150,6 +150,15 @@ void loop() {
        updateLeds(ledsC,2);
       FastLED.show();
     }
+  }
+  else
+  {
+      if (digitalRead(BUTTON_PINA) == LOW ) {
+  
+      gameStarted = true;  // Restart the game
+   
+    }
+
   }
 
   }
