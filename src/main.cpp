@@ -1,6 +1,8 @@
 #include <FastLED.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <ESPAsyncWebServer.h>
+
 #define NUM_LEDS 20
 #define DATA_PINA 17 // Connect to the data wires on the pixel strips
 #define DATA_PINB 19
@@ -10,7 +12,7 @@
 #define BUTTON_PINB 5
 #define BUTTON_PINC 5
 
-bool gameStarted = true;
+bool gameStarted = false;
 
 CRGB ledsA[NUM_LEDS]; // sets number of pixels that will light on each strip.
 CRGB ledsB[NUM_LEDS];
@@ -35,8 +37,84 @@ bool buttonPressed[3];
 
 bool increasing[3];
 unsigned long lastUpdate = 0;
-const unsigned long updateInterval = 50;
+unsigned long updateInterval = 50;
+AsyncWebServer server(80);
 
+void postRule(AsyncWebServerRequest *request, uint8_t *data)
+{
+  size_t len = request->contentLength();
+  Serial.println("Data: ");
+  Serial.write(data, len); // Correctly print the received data
+  Serial.println("\nLength: ");
+  Serial.println(len);
+
+  // Construct the received data string with the specified length
+  String receivedData = "";
+  for (size_t i = 0; i < len; i++)
+  {
+    receivedData += (char)data[i];
+  }
+
+  Serial.println("Received Data String: " + receivedData);
+
+  if (receivedData.indexOf("start") != -1)
+  {
+    gameStarted = true;
+    for (int i = 0; i < 3; i++)
+    {
+      ledIndexes[i] = 0;
+      increasing[i] = true;
+      alreadySelected[i] = false;
+      buttonPressed[i] = false;
+    }
+    request->send(200, "application/json", "{\"status\":\"game started\"}");
+    Serial.println("Command received: start");
+  }
+  else if (receivedData.indexOf("shutdown") != -1)
+  {
+    gameStarted = false;
+    FastLED.clear();
+    FastLED.show();
+    request->send(200, "application/json", "{\"status\":\"game shutdown\"}");
+    Serial.println("Command received: shutdown");
+  }
+  else if (receivedData.indexOf("status") != -1)
+  {
+    if (gameStarted)
+    {
+      request->send(200, "application/json", "{\"status\":\"game started\"}");
+    }
+    else
+    {
+      request->send(200, "application/json", "{\"status\":\"game shutdown\"}");
+    }
+    Serial.println("Command received: status");
+  }
+  else if (receivedData.indexOf("updateInterval=")!=-1)
+  {
+      int startIndex = receivedData.indexOf("updateInterval=") + 15;
+    int endIndex = receivedData.indexOf(' ', startIndex); // Assuming commands are space-separated
+
+    if (endIndex == -1) {
+      endIndex = receivedData.length();
+    }
+
+    String intervalStr = receivedData.substring(startIndex, endIndex);
+    int intervalValue = intervalStr.toInt();
+
+    if (intervalValue >= 10 && intervalValue <= 500)
+    {
+      updateInterval = intervalValue;
+      request->send(200, "application/json", "{\"status\":\"update interval set\"}");
+      Serial.println("Command received: updateInterval=" + String(updateInterval));
+    }
+  }
+  else
+  {
+    request->send(400, "application/json", "{\"status\":\"invalid command\"}");
+    Serial.println("Invalid command");
+  }
+}
 void setup()
 {
   // put your setup code here, to run once:
@@ -69,6 +147,15 @@ void setup()
     Serial.println("Connecting to WiFi...");
   }
   Serial.println("Connected to WiFi");
+
+  // Print the IP address
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/api/command", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+            { postRule(request, data); });
+
+  server.begin();
 }
 
 void updateLeds(CRGB *led2Update, int stripNumber)
@@ -154,26 +241,37 @@ void CheckButtonUnPress()
 
 void CheckButtonPress()
 {
+  bool isPressed = false;
   for (size_t i = 0; i < 3; i++)
   {
-    if (!buttonPressed[i] && digitalRead(buttonPins[i]) == LOW)
+    if (buttonPressed[i])
     {
-      // Debounce
-      delay(50);
-      if (digitalRead(buttonPins[i]) == LOW)
+      isPressed = true;
+    }
+  }
+  if (!isPressed)
+  {
+    for (size_t i = 0; i < 3; i++)
+    {
+      if (!buttonPressed[i] && digitalRead(buttonPins[i]) == LOW && !alreadySelected[i])
       {
-        buttonPressed[i] = true;
-        Serial.print("Button pressed: ");
-        Serial.println(i);
-
-        if (!increasing[i]) // if we are decreasing, it's one less
+        // Debounce
+        delay(50);
+        if (digitalRead(buttonPins[i]) == LOW)
         {
-          ledIndexes[i]--;
-        }
-        alreadySelected[i] = true;
+          buttonPressed[i] = true;
+          Serial.print("Button pressed: ");
+          Serial.println(i);
 
-        // Exit the loop as soon as the first button press is detected
-        break;
+          if (!increasing[i]) // if we are decreasing, it's one less
+          {
+            ledIndexes[i]--;
+          }
+          alreadySelected[i] = true;
+
+          // Exit the loop as soon as the first button press is detected
+          break;
+        }
       }
     }
   }
