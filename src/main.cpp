@@ -5,21 +5,18 @@
 #define DATA_PINA 17 // Connect to the data wires on the pixel strips
 #define DATA_PINB 19
 #define DATA_PINC 16
+// Si son 3 se sugiere 5,25,26
 #define BUTTON_PINA 5
-#define BUTTON_PINB 25
-#define BUTTON_PINC 24
+#define BUTTON_PINB 5
+#define BUTTON_PINC 5
 
 bool gameStarted = true;
-
 
 CRGB ledsA[NUM_LEDS]; // sets number of pixels that will light on each strip.
 CRGB ledsB[NUM_LEDS];
 CRGB ledsC[NUM_LEDS];
 
 // To check for button pressed but not enable it again until it is un pressed
-
-
-const CRGB coo = CRGB::Green;
 
 const char *url2SendResult = "https://eovunmo8a5u8h34.m.pipedream.net";
 /*
@@ -63,7 +60,8 @@ void setup()
   FastLED.addLeds<WS2812B, DATA_PINB, GRB>(ledsB, NUM_LEDS);
   FastLED.addLeds<WS2812B, DATA_PINC, GRB>(ledsC, NUM_LEDS);
   pinMode(BUTTON_PINA, INPUT_PULLUP);
-
+  pinMode(BUTTON_PINB, INPUT_PULLUP);
+  pinMode(BUTTON_PINC, INPUT_PULLUP);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -76,22 +74,25 @@ void setup()
 void updateLeds(CRGB *led2Update, int stripNumber)
 {
   int paintTo = 0;
-  if (increasing[stripNumber])
+  if (!alreadySelected[stripNumber])
   {
-
-    ledIndexes[stripNumber]++;
-    if (ledIndexes[stripNumber] >= NUM_LEDS)
+    if (increasing[stripNumber])
     {
-      increasing[stripNumber] = false;
+
+      ledIndexes[stripNumber]++;
+      if (ledIndexes[stripNumber] >= NUM_LEDS)
+      {
+        increasing[stripNumber] = false;
+      }
     }
-  }
-  else
-  {
-
-    ledIndexes[stripNumber]--;
-    if (ledIndexes[stripNumber] <= 0)
+    else
     {
-      increasing[stripNumber] = true;
+
+      ledIndexes[stripNumber]--;
+      if (ledIndexes[stripNumber] <= 0)
+      {
+        increasing[stripNumber] = true;
+      }
     }
   }
   paintTo = ledIndexes[stripNumber];
@@ -133,71 +134,54 @@ void sendLedCountToApi(int countA, int countB, int countC)
   }
 }
 
-
 void CheckButtonUnPress()
 {
-  bool isAnyButtonWaitingForUnPress = false;
-
   for (size_t i = 0; i < 3; i++)
   {
-    if ((digitalRead(buttonPins[i]) == HIGH) && (buttonPressed[i]))
+    if (buttonPressed[i] && digitalRead(buttonPins[i]) == HIGH)
     {
-        buttonPressed[i]=false;
+      // Debounce
+      delay(50);
+      if (digitalRead(buttonPins[i]) == HIGH)
+      {
+        buttonPressed[i] = false;
+        Serial.print("Button unpressed: ");
+        Serial.println(i);
+      }
     }
-
   }
 }
+
 void CheckButtonPress()
 {
-  bool isAnyButtonWaitingForUnPress = false;
   for (size_t i = 0; i < 3; i++)
   {
-    if (buttonPressed[i])
-    {isAnyButtonWaitingForUnPress = true;}
-    
-  }
-  // If we already have one button pressed don't add another
-  if (!isAnyButtonWaitingForUnPress)
-  {
-    if ((digitalRead(buttonPins[0]) == LOW) && (!alreadySelected[0]))
+    if (!buttonPressed[i] && digitalRead(buttonPins[i]) == LOW)
     {
-      Serial.println("Boton presionado A");
-      buttonPressed[0]= true;
-      if (!increasing) // si estamos decrementando es uno menos
+      // Debounce
+      delay(50);
+      if (digitalRead(buttonPins[i]) == LOW)
       {
-        ledIndexes[0]--;
-      }
-      alreadySelected[0] = true;
-    }
-    else if ((digitalRead(buttonPins[1]) == LOW) && (!alreadySelected[1]))
-    {
-      Serial.println("Boton presionado B");
-      buttonPressed[1]= true;
-      if (!increasing) // si estamos decrementando es uno menos
-      {
-        ledIndexes[1]--;
-      }
-      alreadySelected[1] = true;
-    }
-    else if ((digitalRead(buttonPins[2]) == LOW) && (!alreadySelected[2]))
-    {
-      Serial.println("Boton presionado C");
-      buttonPressed[2]= true;
-      if (!increasing) // si estamos decrementando es uno menos
-      {
-        ledIndexes[2]--;
-      }
-      alreadySelected[2] = true;
-    }
-  }
-  
+        buttonPressed[i] = true;
+        Serial.print("Button pressed: ");
+        Serial.println(i);
 
+        if (!increasing[i]) // if we are decreasing, it's one less
+        {
+          ledIndexes[i]--;
+        }
+        alreadySelected[i] = true;
+
+        // Exit the loop as soon as the first button press is detected
+        break;
+      }
+    }
+  }
 }
-
 
 void CheckEndGame()
 {
-  bool gameEnded=true;
+  bool gameEnded = true;
   for (size_t i = 0; i < 3; i++)
   {
     if (!alreadySelected[i])
@@ -209,13 +193,14 @@ void CheckEndGame()
   {
     gameStarted = false;
     int countA = ledIndexes[0];
-   int countB = ledIndexes[1];
-     int countC = ledIndexes[2];
+    int countB = ledIndexes[1];
+    int countC = ledIndexes[2];
     String payload = "{\"ledA\":" + String(countA) + ",\"ledB\":" + String(countB) + ",\"ledC\":" + String(countC) + "}";
-     Serial.println("Seleccionado");
+    Serial.println("Seleccionado");
     Serial.println(payload);
   }
 }
+
 void loop()
 {
 
@@ -235,5 +220,4 @@ void loop()
     }
     CheckEndGame();
   }
- 
 }
