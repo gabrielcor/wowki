@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ESPAsyncWebServer.h>
+#include <ArduinoOTA.h>
 
 #define NUM_LEDS 20
 #define DATA_PINA 17 // Connect to the data wires on the pixel strips
@@ -11,6 +12,16 @@
 #define BUTTON_PINA 5
 #define BUTTON_PINB 5
 #define BUTTON_PINC 5
+std::map<String, CRGB> colorMap = {
+  {"Red", CRGB::Red},
+  {"Green", CRGB::Green},
+  {"Blue", CRGB::Blue},
+  {"Orange", CRGB::Orange},
+  {"Yellow", CRGB::Yellow},
+  {"Purple", CRGB::Purple},
+  {"Cyan", CRGB::Cyan},
+  {"White", CRGB::White}
+};
 
 bool gameStarted = false;
 
@@ -109,6 +120,38 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
       Serial.println("Command received: updateInterval=" + String(updateInterval));
     }
   }
+    else if (receivedData.indexOf("ledColor") != -1)
+  {
+    int ledIndex = receivedData.substring(receivedData.indexOf("ledColor") + 8, receivedData.indexOf('=')).toInt();
+    if (ledIndex < 0 || ledIndex > 2)
+    {
+      request->send(400, "application/json", "{\"status\":\"invalid led index\"}");
+      Serial.println("Invalid LED index: " + String(ledIndex));
+      return;
+    }
+
+    int startIndex = receivedData.indexOf('=') + 1;
+    int endIndex = receivedData.indexOf(' ', startIndex); // Assuming commands are space-separated
+
+    if (endIndex == -1) {
+      endIndex = receivedData.length()-2;
+    }
+
+    String colorStr = receivedData.substring(startIndex, endIndex);
+
+    if (colorMap.find(colorStr) != colorMap.end())
+    {
+      ledColors[ledIndex] = colorMap[colorStr];
+      request->send(200, "application/json", "{\"status\":\"ledColor" + String(ledIndex) + " set\"}");
+      Serial.println("Command received: ledColor" + String(ledIndex) + "=" + colorStr);
+    }
+    else
+    {
+      request->send(400, "application/json", "{\"status\":\"invalid color value\"}");
+      Serial.println("Invalid color value: " + colorStr);
+    }
+  }
+  
   else
   {
     request->send(400, "application/json", "{\"status\":\"invalid command\"}");
@@ -150,7 +193,11 @@ void setup()
 
   // Print the IP address
   Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  Serial.println(WiFi.localIP()); 
+
+    Serial.println("\nEnabling OTA Feature");
+    ArduinoOTA.setPassword("");
+    ArduinoOTA.begin();
 
   server.on("/api/command", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
             { postRule(request, data); });
@@ -301,7 +348,7 @@ void CheckEndGame()
 
 void loop()
 {
-
+  ArduinoOTA.handle();
   if (gameStarted)
   {
     CheckButtonPress();
