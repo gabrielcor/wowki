@@ -29,15 +29,20 @@ CRGB ledsA[NUM_LEDS]; // sets number of pixels that will light on each strip.
 CRGB ledsB[NUM_LEDS];
 CRGB ledsC[NUM_LEDS];
 
-// To check for button pressed but not enable it again until it is un pressed
-
 const char *url2SendResult = "https://eovunmo8a5u8h34.m.pipedream.net";
-/*
+
+// #define WOWKI_EMULATION
+
+
+#ifdef WOWKI_EMULATION
+
 const char* ssid = "Wokwi-GUEST";
 const char* password = "";
-*/
+#else
 const char *ssid = "blackcrow_01";
 const char *password = "8001017170";
+#endif
+
 // LED control variables
 #define CANT_STRIPS 3;
 int ledIndexes[3];
