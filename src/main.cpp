@@ -4,14 +4,17 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoOTA.h>
 
-#define NUM_LEDS 20
+
+#define NUM_LEDS 20 // number of leds of each strip 
 #define DATA_PINA 17 // Connect to the data wires on the pixel strips
 #define DATA_PINB 19
 #define DATA_PINC 16
-// Si son 3 se sugiere 5,25,26
+// pins for the buttons se sugiere 5,25,26
 #define BUTTON_PINA 5
 #define BUTTON_PINB 5
 #define BUTTON_PINC 5
+
+// Supported colors for the strips
 std::map<String, CRGB> colorMap = {
     {"Red", CRGB::Red},
     {"Green", CRGB::Green},
@@ -28,10 +31,10 @@ CRGB ledsA[NUM_LEDS]; // sets number of pixels that will light on each strip.
 CRGB ledsB[NUM_LEDS];
 CRGB ledsC[NUM_LEDS];
 
+// URL to send the result when the puzle is ready (all the strips selected)
 const char *url2SendResult = "https://eovunmo8a5u8h34.m.pipedream.net";
 
 // #define WOWKI_EMULATION
-
 #ifdef WOWKI_EMULATION
 
 const char *ssid = "Wokwi-GUEST";
@@ -42,18 +45,21 @@ const char *password = "8001017170";
 #endif
 
 // LED control variables
-#define CANT_STRIPS 3;
-int ledIndexes[3];
-CRGB ledColors[3];
-bool alreadySelected[3];
-int buttonPins[3];
-bool buttonPressed[3];
+int ledIndexes[3]; // number of leds ON for each strip (it moves until player selects)
+CRGB ledColors[3]; // Colors of the strips
+bool alreadySelected[3]; // To know if the player has selected a number of leds for this strip
+int buttonPins[3]; // to hold the button pins
+bool buttonPressed[3]; // To know if the button for a strip was pressed
 
-bool increasing[3];
-unsigned long lastUpdate = 0;
-unsigned long updateInterval = 50;
-AsyncWebServer server(80);
+bool increasing[3]; // indicates if the light in the strip is moving forward or backward
+unsigned long lastUpdate = 0; // to handle update
+unsigned long updateInterval = 50; // how frequent to update the moving strip
+AsyncWebServer server(80); // to handle the published API
 
+/// @brief Allows to show a hint, when invoked, stops the game makes an animation and shows the LED quantity received as parameters
+/// @param countA How many LEDs to set to ON on Strip 0
+/// @param countB How many LEDs to set to ON on Strip 1
+/// @param countC How many LEDs to set to ON on Strip 2
 void hintLeds(int countA, int countB, int countC)
 {
   gameStarted = false;
@@ -114,6 +120,8 @@ void hintLeds(int countA, int countB, int countC)
   FastLED.show();
 }
 
+/// @brief Used to indicate win or lose blinks and shutdown
+/// @param color 
 void blinkAllLeds(int color)
 {
   const int blinkDuration = 3000; // Total duration to blink in milliseconds
@@ -150,6 +158,9 @@ void blinkAllLeds(int color)
   FastLED.show();
 }
 
+/// @brief Handle the API call
+/// @param request full request
+/// @param data JSON data
 void postRule(AsyncWebServerRequest *request, uint8_t *data)
 {
   size_t len = request->contentLength();
@@ -294,6 +305,8 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
     Serial.println("Invalid command");
   }
 }
+
+/// @brief Initialize the game
 void setup()
 {
   // put your setup code here, to run once:
@@ -305,6 +318,8 @@ void setup()
     alreadySelected[i] = false;
     buttonPressed[i] = false;
   }
+
+  // Default colors for the strips
   ledColors[0] = CRGB::Green;
   ledColors[1] = CRGB::Blue;
   ledColors[2] = CRGB::Orange;
@@ -313,12 +328,16 @@ void setup()
   buttonPins[2] = BUTTON_PINC;
 
   Serial.println("Hello, ESP32!");
+  // LED Setup
   FastLED.addLeds<WS2812B, DATA_PINA, GRB>(ledsA, NUM_LEDS);
   FastLED.addLeds<WS2812B, DATA_PINB, GRB>(ledsB, NUM_LEDS);
   FastLED.addLeds<WS2812B, DATA_PINC, GRB>(ledsC, NUM_LEDS);
+  // Button setup
   pinMode(BUTTON_PINA, INPUT_PULLUP);
   pinMode(BUTTON_PINB, INPUT_PULLUP);
   pinMode(BUTTON_PINC, INPUT_PULLUP);
+
+  // Wifi setup
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -331,10 +350,12 @@ void setup()
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
+  // Enabling OTA
   Serial.println("\nEnabling OTA Feature");
   ArduinoOTA.setPassword("");
   ArduinoOTA.begin();
 
+  // Start API server 
   server.on("/api/command", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
             { postRule(request, data); });
 
@@ -375,6 +396,10 @@ void updateLeds(CRGB *led2Update, int stripNumber)
   }
 }
 
+/// @brief Call the receiving API in the controlling server to inform the selected numbers for each strip
+/// @param countA Selected number for Strip 0
+/// @param countB Selected number for Strip 1
+/// @param countC Selected number for Strip 2
 void sendLedCountToApi(int countA, int countB, int countC)
 {
   if (WiFi.status() == WL_CONNECTED)
@@ -404,8 +429,12 @@ void sendLedCountToApi(int countA, int countB, int countC)
   }
 }
 
+/// @brief check if the button is unpressed to enable other button presses
 void CheckButtonUnPress()
 {
+  // The unpressing of the buttons can be handled independently 
+  // of the previous states because it does not change the internal state
+  // of the game.
   for (size_t i = 0; i < 3; i++)
   {
     if (buttonPressed[i] && digitalRead(buttonPins[i]) == HIGH)
@@ -422,8 +451,11 @@ void CheckButtonUnPress()
   }
 }
 
+/// @brief Check if a button is pressed. Only handle one at a time
 void CheckButtonPress()
 {
+
+  // Check if I have one button pressed that has not been "unpressed"
   bool isPressed = false;
   for (size_t i = 0; i < 3; i++)
   {
@@ -432,13 +464,17 @@ void CheckButtonPress()
       isPressed = true;
     }
   }
+
+  // only handle if there is no other button pressed
   if (!isPressed)
   {
     for (size_t i = 0; i < 3; i++)
     {
+      // check if it is pressed and has not been already selected yet (no need to handle it)
       if (!buttonPressed[i] && digitalRead(buttonPins[i]) == LOW && !alreadySelected[i])
       {
         // Debounce
+        // check again (IMPORTANT: if you do not debounce side effects can be a nightmare)
         delay(50);
         if (digitalRead(buttonPins[i]) == LOW)
         {
@@ -482,17 +518,20 @@ void CheckEndGame()
   }
 }
 
+// Main loop
 void loop()
 {
   ArduinoOTA.handle();
+
+  // if game is shutdown, do not update the LEDs
   if (gameStarted)
   {
+    // Check for pressing and unpressing buttons
     CheckButtonPress();
     CheckButtonUnPress();
     // Update LED sequence
     if ((millis() - lastUpdate) > updateInterval)
     {
-
       lastUpdate = millis();
       updateLeds(ledsA, 0);
       updateLeds(ledsB, 1);
