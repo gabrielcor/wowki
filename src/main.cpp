@@ -54,6 +54,66 @@ unsigned long lastUpdate = 0;
 unsigned long updateInterval = 50;
 AsyncWebServer server(80);
 
+void hintLeds(int countA, int countB, int countC)
+{
+  gameStarted = false;
+  // Move forward and backward for each strip
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
+    for (int j = 0; j < NUM_LEDS; j++)
+    {
+      ledsA[j] = (j <= i) ? ledColors[0] : CRGB::Black;
+      ledsB[j] = (j <= i) ? ledColors[1] : CRGB::Black;
+      ledsC[j] = (j <= i) ? ledColors[2] : CRGB::Black;
+    }
+    FastLED.show();
+    delay(updateInterval);
+  }
+
+  for (int i = NUM_LEDS - 1; i >= 0; i--)
+  {
+    for (int j = 0; j < NUM_LEDS; j++)
+    {
+      ledsA[j] = (j <= i) ? ledColors[0] : CRGB::Black;
+      ledsB[j] = (j <= i) ? ledColors[1] : CRGB::Black;
+      ledsC[j] = (j <= i) ? ledColors[2] : CRGB::Black;
+    }
+    FastLED.show();
+    delay(updateInterval);
+  }
+
+  // Blink five times at the speed of updateInterval
+  for (int k = 0; k < 5; k++)
+  {
+    for (int i = 0; i < NUM_LEDS; i++)
+    {
+      ledsA[i] = CRGB::Black;
+      ledsB[i] = CRGB::Black;
+      ledsC[i] = CRGB::Black;
+    }
+    FastLED.show();
+    delay(updateInterval);
+
+    for (int i = 0; i < NUM_LEDS; i++)
+    {
+      ledsA[i] = ledColors[0];
+      ledsB[i] = ledColors[1];
+      ledsC[i] = ledColors[2];
+    }
+    FastLED.show();
+    delay(updateInterval);
+  }
+
+  // Turn on the specific number of LEDs for each strip
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
+    ledsA[i] = (i < countA) ? ledColors[0] : CRGB::Black;
+    ledsB[i] = (i < countB) ? ledColors[1] : CRGB::Black;
+    ledsC[i] = (i < countC) ? ledColors[2] : CRGB::Black;
+  }
+  FastLED.show();
+}
+
 void blinkAllLeds(int color)
 {
   const int blinkDuration = 3000; // Total duration to blink in milliseconds
@@ -137,7 +197,7 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
     request->send(200, "application/json", "{\"status\":\"game win\"}");
     Serial.println("Command received: win");
   }
-    else if (receivedData.indexOf("lose") != -1)
+  else if (receivedData.indexOf("lose") != -1)
   {
     gameStarted = false;
     FastLED.clear();
@@ -210,7 +270,24 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
       Serial.println("Invalid color value: " + colorStr);
     }
   }
+  else if (receivedData.indexOf("hint") != -1)
+  {
+    int startIndex = receivedData.indexOf("hint=") + 5;
+    int endIndex = receivedData.indexOf(' ', startIndex); // Assuming commands are space-separated
 
+    if (endIndex == -1)
+    {
+      endIndex = receivedData.length();
+    }
+
+    String hintStr = receivedData.substring(startIndex, endIndex);
+    int x, y, z;
+    sscanf(hintStr.c_str(), "%d,%d,%d", &x, &y, &z);
+
+    hintLeds(x, y, z);
+    request->send(200, "application/json", "{\"status\":\"hint executed\"}");
+    Serial.println("Command received: hint with values=" + hintStr);
+  }
   else
   {
     request->send(400, "application/json", "{\"status\":\"invalid command\"}");
