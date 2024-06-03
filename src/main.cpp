@@ -13,15 +13,14 @@
 #define BUTTON_PINB 5
 #define BUTTON_PINC 5
 std::map<String, CRGB> colorMap = {
-  {"Red", CRGB::Red},
-  {"Green", CRGB::Green},
-  {"Blue", CRGB::Blue},
-  {"Orange", CRGB::Orange},
-  {"Yellow", CRGB::Yellow},
-  {"Purple", CRGB::Purple},
-  {"Cyan", CRGB::Cyan},
-  {"White", CRGB::White}
-};
+    {"Red", CRGB::Red},
+    {"Green", CRGB::Green},
+    {"Blue", CRGB::Blue},
+    {"Orange", CRGB::Orange},
+    {"Yellow", CRGB::Yellow},
+    {"Purple", CRGB::Purple},
+    {"Cyan", CRGB::Cyan},
+    {"White", CRGB::White}};
 
 bool gameStarted = false;
 
@@ -33,11 +32,10 @@ const char *url2SendResult = "https://eovunmo8a5u8h34.m.pipedream.net";
 
 // #define WOWKI_EMULATION
 
-
 #ifdef WOWKI_EMULATION
 
-const char* ssid = "Wokwi-GUEST";
-const char* password = "";
+const char *ssid = "Wokwi-GUEST";
+const char *password = "";
 #else
 const char *ssid = "blackcrow_01";
 const char *password = "8001017170";
@@ -55,6 +53,42 @@ bool increasing[3];
 unsigned long lastUpdate = 0;
 unsigned long updateInterval = 50;
 AsyncWebServer server(80);
+
+void blinkAllLeds(int color)
+{
+  const int blinkDuration = 3000; // Total duration to blink in milliseconds
+  const int blinkInterval = 100;  // Blink interval in milliseconds
+  unsigned long startMillis = millis();
+  bool ledState = false;
+
+  CRGB colorToShow;
+  if (color == 1)
+    colorToShow = CRGB::Red;
+  else
+    colorToShow = CRGB::Green;
+
+  while (millis() - startMillis < blinkDuration)
+  {
+    ledState = !ledState;
+    for (int i = 0; i < NUM_LEDS; i++)
+    {
+      ledsA[i] = ledState ? colorToShow : CRGB::Black;
+      ledsB[i] = ledState ? colorToShow : CRGB::Black;
+      ledsC[i] = ledState ? colorToShow : CRGB::Black;
+    }
+    FastLED.show();
+    delay(blinkInterval);
+  }
+
+  // Turn off all LEDs after blinking
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
+    ledsA[i] = CRGB::Black;
+    ledsB[i] = CRGB::Black;
+    ledsC[i] = CRGB::Black;
+  }
+  FastLED.show();
+}
 
 void postRule(AsyncWebServerRequest *request, uint8_t *data)
 {
@@ -94,6 +128,24 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
     request->send(200, "application/json", "{\"status\":\"game shutdown\"}");
     Serial.println("Command received: shutdown");
   }
+  else if (receivedData.indexOf("win") != -1)
+  {
+    gameStarted = false;
+    FastLED.clear();
+    FastLED.show();
+    blinkAllLeds(2);
+    request->send(200, "application/json", "{\"status\":\"game win\"}");
+    Serial.println("Command received: win");
+  }
+    else if (receivedData.indexOf("lose") != -1)
+  {
+    gameStarted = false;
+    FastLED.clear();
+    FastLED.show();
+    blinkAllLeds(1);
+    request->send(200, "application/json", "{\"status\":\"game lose\"}");
+    Serial.println("Command received: lose");
+  }
   else if (receivedData.indexOf("status") != -1)
   {
     if (gameStarted)
@@ -106,12 +158,13 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
     }
     Serial.println("Command received: status");
   }
-  else if (receivedData.indexOf("updateInterval=")!=-1)
+  else if (receivedData.indexOf("updateInterval=") != -1)
   {
-      int startIndex = receivedData.indexOf("updateInterval=") + 15;
+    int startIndex = receivedData.indexOf("updateInterval=") + 15;
     int endIndex = receivedData.indexOf(' ', startIndex); // Assuming commands are space-separated
 
-    if (endIndex == -1) {
+    if (endIndex == -1)
+    {
       endIndex = receivedData.length();
     }
 
@@ -125,7 +178,7 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
       Serial.println("Command received: updateInterval=" + String(updateInterval));
     }
   }
-    else if (receivedData.indexOf("ledColor") != -1)
+  else if (receivedData.indexOf("ledColor") != -1)
   {
     int ledIndex = receivedData.substring(receivedData.indexOf("ledColor") + 8, receivedData.indexOf('=')).toInt();
     if (ledIndex < 0 || ledIndex > 2)
@@ -138,8 +191,9 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
     int startIndex = receivedData.indexOf('=') + 1;
     int endIndex = receivedData.indexOf(' ', startIndex); // Assuming commands are space-separated
 
-    if (endIndex == -1) {
-      endIndex = receivedData.length()-2;
+    if (endIndex == -1)
+    {
+      endIndex = receivedData.length() - 2;
     }
 
     String colorStr = receivedData.substring(startIndex, endIndex);
@@ -156,7 +210,7 @@ void postRule(AsyncWebServerRequest *request, uint8_t *data)
       Serial.println("Invalid color value: " + colorStr);
     }
   }
-  
+
   else
   {
     request->send(400, "application/json", "{\"status\":\"invalid command\"}");
@@ -198,11 +252,11 @@ void setup()
 
   // Print the IP address
   Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP()); 
+  Serial.println(WiFi.localIP());
 
-    Serial.println("\nEnabling OTA Feature");
-    ArduinoOTA.setPassword("");
-    ArduinoOTA.begin();
+  Serial.println("\nEnabling OTA Feature");
+  ArduinoOTA.setPassword("");
+  ArduinoOTA.begin();
 
   server.on("/api/command", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
             { postRule(request, data); });
