@@ -32,7 +32,8 @@ CRGB ledsB[NUM_LEDS];
 CRGB ledsC[NUM_LEDS];
 
 // URL to send the result when the puzle is ready (all the strips selected)
-const char *url2SendResult = "https://eovunmo8a5u8h34.m.pipedream.net";
+const char *url2SendResult = "http://192.168.20.147:8123/api/events/bc_custom_event";
+const char *bearerString = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiNjI1NzRjNmExYTg0MGE1OGFjZGQ4YTViMTBkYWY2OSIsImlhdCI6MTczMjgwMjkxMCwiZXhwIjoyMDQ4MTYyOTEwfQ.Cv7l7q76Sd6nWn3QweivugxsXh85ylk-mhQqtfKfbhs";
 
 // #define WOWKI_EMULATION
 #ifdef WOWKI_EMULATION
@@ -402,13 +403,18 @@ void updateLeds(CRGB *led2Update, int stripNumber)
 /// @param countC Selected number for Strip 2
 void sendLedCountToApi(int countA, int countB, int countC)
 {
+   Serial.println("sendLedCountToApi...");
+
   if (WiFi.status() == WL_CONNECTED)
   {
     HTTPClient http;
     http.begin(url2SendResult); // Replace with your API endpoint
     http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", bearerString); 
 
-    String payload = "{\"ledA\":" + String(countA) + ",\"ledB\":" + String(countB) + ",\"ledC\":" + String(countC) + "}";
+//    String payload = "{\"ledA\":" + String(countA) + ",\"ledB\":" + String(countB) + ",\"ledC\":" + String(countC) + "}";
+    String payload = "{\"event_type\": \"state_changed\", \"entity_id\": \"custom_sensor.component_transform\", \"event\": { \"entity_id\": \"custom_sensor.component_transform\",\"new_state\": {\"entity_id\": \"custom_sensor.component_transform\", \"state\": \"["+ String(countA)+","+ String(countB)+","+ String(countC) +  "]\"}}}";
+    Serial.println(payload);
     int httpResponseCode = http.POST(payload);
 
     if (httpResponseCode > 0)
@@ -513,8 +519,10 @@ void CheckEndGame()
     int countB = ledIndexes[1];
     int countC = ledIndexes[2];
     String payload = "{\"ledA\":" + String(countA) + ",\"ledB\":" + String(countB) + ",\"ledC\":" + String(countC) + "}";
-    Serial.println("Seleccionado");
+    Serial.println("Seleccionado - ");
     Serial.println(payload);
+    sendLedCountToApi(countA, countB, countC);
+
   }
 }
 
