@@ -43,6 +43,8 @@ const char *password = "";
 #else
 const char *ssid = "blackcrow_01";
 const char *password = "8001017170";
+const char *ssid2 = "Beacon";
+const char *password2 = "abcd1234*";
 #endif
 
 // LED control variables
@@ -339,11 +341,19 @@ void setup()
   pinMode(BUTTON_PINC, INPUT_PULLUP);
 
   // Wifi setup
+  int retriesdone= 0;
+  
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(1000);
-    Serial.println("Connecting to WiFi...");
+    Serial.print("Connecting to WiFi ");
+    Serial.println(WiFi.SSID());
+    retriesdone++;
+    if (retriesdone == 10)
+    {
+      WiFi.begin(ssid2,password2);
+    }
   }
   Serial.println("Connected to WiFi");
 
